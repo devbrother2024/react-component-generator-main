@@ -1,8 +1,8 @@
 import { stripCodeFences, ensureRenderCall } from './generator';
 import { withModelFallback } from './fallback';
 
-// 우선순위 순서. 앞 모델이 실패하면 다음 모델로 폴백한다.
-const GOOGLE_MODELS = ['gemini-3.1-flash-lite', 'gemini-3.5-flash'];
+import { generationError, generationStream } from './generationStream';
+import { GOOGLE_MODELS, requestAnthropic, requestGoogle } from './providerRequests';
 
 const SYSTEM_PROMPT = `You are a React component generator. Generate a single React component based on the user's description.
 
@@ -66,20 +66,7 @@ function resolveApiKey(provider: Provider, clientKey?: string): string | null {
 }
 
 async function callAnthropic(prompt: string, apiKey: string): Promise<string> {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 4096,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: prompt }],
-    }),
-  });
+  const response = await requestAnthropic(fetch, prompt, apiKey, SYSTEM_PROMPT);
 
   if (!response.ok) {
     throw new Error(`Claude API error: ${response.status}`);
@@ -96,17 +83,7 @@ async function callAnthropic(prompt: string, apiKey: string): Promise<string> {
 }
 
 async function callGoogleModel(prompt: string, apiKey: string, model: string): Promise<string> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { maxOutputTokens: 8192 },
-    }),
-  });
+  const response = await requestGoogle(fetch, prompt, apiKey, SYSTEM_PROMPT, model);
 
   if (!response.ok) {
     throw new Error(`Gemini API error: ${response.status}`);
@@ -136,7 +113,8 @@ async function callGoogle(prompt: string, apiKey: string): Promise<string> {
 }
 
 const server = Bun.serve({
-  port: 3002,
+  port: Number(process.env.COMPONENT_GENERATOR_API_PORT ?? 3002),
+  idleTimeout: 120,
   async fetch(req) {
     if (req.method === 'OPTIONS') {
       return new Response(null, { headers: CORS_HEADERS });
@@ -180,6 +158,16 @@ const server = Bun.serve({
           );
         }
 
+        if (req.headers.get('Accept') === 'text/event-stream') {
+          return new Response(generationStream(provider, prompt, resolvedKey, SYSTEM_PROMPT), {
+            headers: {
+              ...CORS_HEADERS,
+              'Content-Type': 'text/event-stream; charset=utf-8',
+              'Cache-Control': 'no-cache',
+            },
+          });
+        }
+
         const text =
           provider === 'google'
             ? await callGoogle(prompt, resolvedKey)
@@ -189,26 +177,8 @@ const server = Bun.serve({
 
         return Response.json({ code }, { headers: CORS_HEADERS });
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Unknown error';
-
-        if (message.includes('503')) {
-          return Response.json(
-            { error: 'API 서버가 일시적으로 과부하 상태입니다. 잠시 후 다시 시도해주세요.' },
-            { status: 503, headers: CORS_HEADERS }
-          );
-        }
-
-        if (message.includes('429')) {
-          return Response.json(
-            { error: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' },
-            { status: 429, headers: CORS_HEADERS }
-          );
-        }
-
-        return Response.json(
-          { error: message },
-          { status: 500, headers: CORS_HEADERS }
-        );
+        const { message, status } = generationError(err);
+        return Response.json({ error: message }, { status, headers: CORS_HEADERS });
       }
     }
 

@@ -8,12 +8,14 @@ interface ComponentCardProps {
   onRemove: (id: string) => void;
   onRegenerate: (prompt: string) => void;
   isLoading: boolean;
+  isStreaming: boolean;
 }
 
 type Tab = 'preview' | 'code';
 
-export function ComponentCard({ component, onRemove, onRegenerate, isLoading }: ComponentCardProps) {
-  const [activeTab, setActiveTab] = useState<Tab>('preview');
+export function ComponentCard({ component, onRemove, onRegenerate, isLoading, isStreaming }: ComponentCardProps) {
+  const [selectedTab, setActiveTab] = useState<Tab>('preview');
+  const activeTab = isStreaming ? 'code' : selectedTab;
   const [previewKey, setPreviewKey] = useState(0);
   const createdAt = component.createdAt.toLocaleTimeString('ko-KR', {
     hour: '2-digit',
@@ -27,7 +29,7 @@ export function ComponentCard({ component, onRemove, onRegenerate, isLoading }: 
           <span>{createdAt}</span>
           <p className="card-prompt">{component.prompt}</p>
         </div>
-        <div className="card-actions">
+        {!isStreaming && <div className="card-actions">
           <button
             className="btn-refresh"
             onClick={() => setPreviewKey((k) => k + 1)}
@@ -49,18 +51,21 @@ export function ComponentCard({ component, onRemove, onRegenerate, isLoading }: 
           >
             삭제
           </button>
-        </div>
+        </div>}
       </div>
       <div className="card-tabs">
         <button
           className={`tab ${activeTab === 'preview' ? 'tab--active' : ''}`}
+          aria-pressed={activeTab === 'preview'}
+          disabled={isStreaming}
           onClick={() => setActiveTab('preview')}
         >
           미리보기
         </button>
         <button
           className={`tab ${activeTab === 'code' ? 'tab--active' : ''}`}
-          onClick={() => setActiveTab('code')}
+          aria-pressed={activeTab === 'code'}
+          onClick={() => { if (!isStreaming) setActiveTab('code'); }}
         >
           코드
         </button>
@@ -69,7 +74,7 @@ export function ComponentCard({ component, onRemove, onRegenerate, isLoading }: 
         {activeTab === 'preview' ? (
           <LivePreview key={previewKey} code={component.code} />
         ) : (
-          <CodeView code={component.code} />
+          <CodeView code={component.code} isStreaming={isStreaming} />
         )}
       </div>
     </div>

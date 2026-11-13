@@ -5,12 +5,11 @@ import App from './App';
 
 beforeEach(() => {
   localStorage.clear();
-  vi.stubGlobal('fetch', vi.fn(async (url: string) => ({
-    ok: true,
-    json: async () => url === '/api/config'
-      ? { envKeys: { anthropic: true, google: true } }
-      : { code: 'render(<div>Generated preview</div>);' },
-  })));
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => url === '/api/config'
+    ? Response.json({ envKeys: { anthropic: true, google: true } })
+    : new Response('data: {"type":"complete","code":"render(<div>Generated preview</div>);"}\n\n', {
+      headers: { 'Content-Type': 'text/event-stream' },
+    })));
 });
 
 afterEach(() => {
@@ -67,4 +66,32 @@ test('restores a successful prompt for reuse after clearing the results and relo
   render(<App />);
   await user.click(screen.getByRole('button', { name: '검색 카드 만들기' }));
   expect(screen.getByLabelText('무엇을 만들까요?')).toHaveValue('검색 카드 만들기');
+});
+
+test('shows incoming code before switching to the completed preview', async () => {
+  const user = userEvent.setup();
+  const encoder = new TextEncoder();
+  let send!: ReadableStreamDefaultController<Uint8Array>;
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) { send = controller; },
+  });
+  vi.mocked(fetch).mockImplementation(async (url) => url === '/api/config'
+    ? Response.json({ envKeys: { anthropic: true, google: true } })
+    : new Response(body, { headers: { 'Content-Type': 'text/event-stream' } }));
+
+  render(<App />);
+  await user.type(screen.getByLabelText('무엇을 만들까요?'), '스트리밍 카드');
+  await user.click(screen.getByRole('button', { name: '컴포넌트 생성' }));
+  expect(screen.getByRole('button', { name: '코드', pressed: true })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '미리보기' })).toBeDisabled();
+
+  send.enqueue(encoder.encode('data: {"type":"delta","text":"const Card = '));
+  send.enqueue(encoder.encode('() => <div>생성 중"}\r\n\r\n'));
+  expect(await screen.findByText('const Card = () => <div>생성 중')).toBeInTheDocument();
+  expect(localStorage.getItem('react-component-generator:components')).toBe('[]');
+
+  send.enqueue(encoder.encode('data: {"type":"complete","code":"render(<div>Streaming preview</div>);"}\n\n'));
+  send.close();
+  expect(await screen.findByText('Streaming preview')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '미리보기', pressed: true })).toBeEnabled();
 });

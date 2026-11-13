@@ -31,7 +31,7 @@ function App() {
     anthropic: false,
     google: false,
   });
-  const { components, promptHistory, isLoading, error, generate, removeComponent, clearAll } =
+  const { components, pendingComponent, promptHistory, isLoading, error, generate, removeComponent, clearAll } =
     useComponentGenerator();
 
   useEffect(() => {
@@ -78,7 +78,7 @@ function App() {
             <PromptInput onGenerate={handleGenerate} isLoading={isLoading} promptHistory={promptHistory} />
           </section>
 
-          <section className="results-section work-window" aria-labelledby="results-title" aria-busy={isLoading}>
+          <section className="results-section work-window" aria-labelledby="results-title">
             <div className="window-bar window-bar--preview">
               <span className="window-icon" aria-hidden="true">▣</span>
               <h2 id="results-title">생성 결과</h2>
@@ -110,10 +110,11 @@ function App() {
             )}
 
             <div className="results-grid">
-              {components.map((component) => (
+              {(pendingComponent ? [pendingComponent, ...components] : components).map((component) => (
                 <ComponentCard
                   key={component.id}
                   component={component}
+                  isStreaming={component.id === pendingComponent?.id}
                   onRemove={removeComponent}
                   onRegenerate={handleGenerate}
                   isLoading={isLoading}
