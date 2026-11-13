@@ -1,0 +1,37 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  color-scheme: light;
+  font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
+  --paper: #f5f2e9;
+  --surface: #fffdf7;
+  --ink: #262139;
+  --muted: #625a72;
+  --violet: #56408c;
+  --lavender: #e5dcf5;
+  --yellow: #ffdb68;
+  --line: #d3c9df;
+  --danger: #9d254c;
+  --mono: 'Courier Prime', 'SFMono-Regular', Consolas, monospace;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--violet);
+  outline-offset: 3px;
+}
