@@ -165,6 +165,21 @@
   color: var(--muted);
 }
 
+.prompt-textarea[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.prompt-feedback {
+  color: var(--muted);
+  font-size: .82rem;
+  text-align: right;
+}
+
+.prompt-feedback p {
+  margin: 4px 0 0;
+  color: var(--danger);
+}
+
 .prompt-actions {
   display: flex;
   flex-wrap: wrap;

@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { MAX_PROMPT_LENGTH, validatePrompt } from '../utils/validatePrompt';
 
 interface PromptInputProps {
   onGenerate: (prompt: string) => void;
@@ -17,11 +18,13 @@ const EXAMPLES = [
 export function PromptInput({ onGenerate, isLoading }: PromptInputProps) {
   const [prompt, setPrompt] = useState('');
   const promptField = useRef<HTMLTextAreaElement>(null);
+  const { trimmedPrompt, length, isTooLong } = validatePrompt(prompt);
+  const canGenerate = Boolean(trimmedPrompt) && !isTooLong && !isLoading;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (prompt.trim() && !isLoading) {
-      onGenerate(prompt.trim());
+    if (canGenerate) {
+      onGenerate(trimmedPrompt);
     }
   };
 
@@ -41,6 +44,8 @@ export function PromptInput({ onGenerate, isLoading }: PromptInputProps) {
           onChange={(e) => setPrompt(e.target.value)}
           placeholder="예: 아바타와 팔로우 버튼이 있는 프로필 카드를 만들어줘."
           className="prompt-textarea"
+          aria-invalid={isTooLong}
+          aria-describedby={isTooLong ? 'prompt-length prompt-error' : 'prompt-length'}
           rows={3}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -48,12 +53,20 @@ export function PromptInput({ onGenerate, isLoading }: PromptInputProps) {
             }
           }}
         />
+        <div className="prompt-feedback">
+          <span id="prompt-length">{length} / {MAX_PROMPT_LENGTH}자</span>
+          {isTooLong && (
+            <p id="prompt-error" role="alert">
+              프롬프트를 {MAX_PROMPT_LENGTH}자 이하로 줄여주세요.
+            </p>
+          )}
+        </div>
         <div className="prompt-actions">
           <span className="keyboard-hint"><kbd>⌘ / Ctrl</kbd> <kbd>Enter</kbd></span>
           <button
             type="submit"
             className="btn-generate"
-            disabled={!prompt.trim() || isLoading}
+            disabled={!canGenerate}
           >
             {isLoading ? '생성 중...' : '컴포넌트 생성'}
           </button>
