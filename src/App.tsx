@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { PromptInput } from './components/PromptInput';
 import { ComponentCard } from './components/ComponentCard';
 import { useComponentGenerator } from './hooks/useComponentGenerator';
+import { useStoredState } from './hooks/useStoredState';
 import type { Provider } from './types';
 import './App.css';
 
@@ -11,14 +12,26 @@ const PROVIDER_CONFIG = {
 } as const;
 
 function App() {
-  const [apiKey, setApiKey] = useState('');
+  const [{ provider, apiKey }, setSettings] = useStoredState<{ provider: Provider; apiKey: string }>(
+    'settings',
+    { provider: 'google', apiKey: '' },
+    (value) => {
+      if (value && typeof value === 'object' && 'provider' in value &&
+          (value.provider === 'google' || value.provider === 'anthropic')) {
+        return {
+          provider: value.provider,
+          apiKey: 'apiKey' in value && typeof value.apiKey === 'string' ? value.apiKey : '',
+        };
+      }
+      return { provider: 'google', apiKey: '' };
+    },
+  );
   const [showKey, setShowKey] = useState(false);
-  const [provider, setProvider] = useState<Provider>('google');
   const [envKeys, setEnvKeys] = useState<Record<Provider, boolean>>({
     anthropic: false,
     google: false,
   });
-  const { components, isLoading, error, generate, removeComponent, clearAll } =
+  const { components, promptHistory, isLoading, error, generate, removeComponent, clearAll } =
     useComponentGenerator();
 
   useEffect(() => {
@@ -39,8 +52,7 @@ function App() {
   };
 
   const handleProviderChange = (newProvider: Provider) => {
-    setProvider(newProvider);
-    setApiKey('');
+    setSettings({ provider: newProvider, apiKey: '' });
   };
 
   return (
@@ -63,7 +75,7 @@ function App() {
               <h2 id="prompt-title">프롬프트 편집기</h2>
               <span className="window-grip" aria-hidden="true" />
             </div>
-            <PromptInput onGenerate={handleGenerate} isLoading={isLoading} />
+            <PromptInput onGenerate={handleGenerate} isLoading={isLoading} promptHistory={promptHistory} />
           </section>
 
           <section className="results-section work-window" aria-labelledby="results-title" aria-busy={isLoading}>
@@ -141,7 +153,7 @@ function App() {
                 id="api-key"
                 type={showKey ? 'text' : 'password'}
                 value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
+                onChange={(e) => setSettings({ provider, apiKey: e.target.value })}
                 placeholder={
                   hasEnvKey
                     ? '서버 키 사용 중'

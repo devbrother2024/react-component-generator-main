@@ -4,6 +4,7 @@ import { MAX_PROMPT_LENGTH, validatePrompt } from '../utils/validatePrompt';
 interface PromptInputProps {
   onGenerate: (prompt: string) => void;
   isLoading: boolean;
+  promptHistory?: string[];
 }
 
 const EXAMPLES = [
@@ -15,7 +16,7 @@ const EXAMPLES = [
   { label: '고객 상세 패널', prompt: '테이블 행 상세보기 패널. 선택한 고객의 기본 정보와 최근 활동 표시' },
 ];
 
-export function PromptInput({ onGenerate, isLoading }: PromptInputProps) {
+export function PromptInput({ onGenerate, isLoading, promptHistory = [] }: PromptInputProps) {
   const [prompt, setPrompt] = useState('');
   const promptField = useRef<HTMLTextAreaElement>(null);
   const { trimmedPrompt, length, isTooLong } = validatePrompt(prompt);
@@ -28,7 +29,7 @@ export function PromptInput({ onGenerate, isLoading }: PromptInputProps) {
     }
   };
 
-  const handleExampleClick = (example: string) => {
+  const selectPrompt = (example: string) => {
     setPrompt(example);
     promptField.current?.focus();
   };
@@ -72,13 +73,28 @@ export function PromptInput({ onGenerate, isLoading }: PromptInputProps) {
           </button>
         </div>
       </form>
+      {promptHistory.length > 0 && (
+        <div className="prompt-examples">
+          <span className="examples-label">프롬프트 히스토리</span>
+          {promptHistory.map((entry) => (
+            <button
+              key={entry}
+              className="example-chip"
+              onClick={() => selectPrompt(entry)}
+              type="button"
+            >
+              {entry}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="prompt-examples">
         <span className="examples-label">예시 프롬프트</span>
         {EXAMPLES.map(({ label, prompt: example }) => (
           <button
             key={label}
             className="example-chip"
-            onClick={() => handleExampleClick(example)}
+            onClick={() => selectPrompt(example)}
             type="button"
           >
             {label}
